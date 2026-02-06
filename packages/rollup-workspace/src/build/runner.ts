@@ -1,5 +1,6 @@
 import { buildCommand, formatTime, overrideConsole, parseArgs, Reporter } from "~/cli";
 import { Env } from "~/factory";
+import { getNodeFileSystem } from "~/FileSystem";
 import { Package, Workspace, type DiscoverWorkspaceOptions } from "~/workspace";
 
 import { Dispatcher } from "./Dispatcher";
@@ -72,16 +73,7 @@ export async function build(options?: BuildOptions) {
 		}
 
 		// get file system API
-		let fs = options?.fs;
-		if (!fs) {
-			const nodeFsPromises = await import("node:fs/promises");
-			const nodeFsSync = await import("node:fs");
-			fs = {
-				glob: nodeFsPromises.glob,
-				readFile: nodeFsPromises.readFile,
-				watch: nodeFsSync.watch,
-			};
-		}
+		const fs = options?.fs ?? (await getNodeFileSystem());
 
 		// discover package we started in
 		const startPackage = await Package.discover({ ...options, cwd, fs });

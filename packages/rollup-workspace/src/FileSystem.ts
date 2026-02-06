@@ -22,3 +22,13 @@ export interface Watcher {
 	close: () => void;
 	on: (type: "change", listener: () => void) => void;
 }
+
+export async function getNodeFileSystem(): Promise<FileSystem> {
+	const fsCallbacks = await import("node:fs");
+	const fsPromises = await import("node:fs/promises");
+	return {
+		glob: fsPromises.glob,
+		readFile: fsPromises.readFile,
+		watch: fsCallbacks.watch,
+	};
+}

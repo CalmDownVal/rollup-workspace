@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import type { FileSystem } from "~/types";
+import type { FileSystem } from "~/FileSystem";
 
 export interface PackageDeclaration {
 	[key: string]: unknown;

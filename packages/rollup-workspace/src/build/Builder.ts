@@ -3,7 +3,7 @@ import { pathToFileURL } from "node:url";
 import { rollup } from "rollup";
 
 import type { BuildContext, BuildTarget, BuildTask } from "~/factory";
-import type { FileSystem, Watcher } from "~/types";
+import type { FileSystem, Watcher } from "~/FileSystem";
 import type { Package } from "~/workspace";
 
 export type BuildCall = Omit<BuildContext, "cwd" | "moduleName">;

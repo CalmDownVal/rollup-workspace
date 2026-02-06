@@ -1,6 +1,6 @@
 import { AbortError } from "~/AbortError";
+import type { FileSystem } from "~/FileSystem";
 import type { Package } from "~/workspace";
-import type { FileSystem } from "~/types";
 
 import { Builder, type BuildCall } from "./Builder";
 
