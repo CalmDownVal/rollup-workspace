@@ -27,6 +27,7 @@ export default function TextLoaderPlugin(pluginOptions) {
 				return null;
 			}
 
+			this.addWatchFile(id);
 			return {
 				code: `export default ${quoteText(code)};`,
 				moduleSideEffects: false,

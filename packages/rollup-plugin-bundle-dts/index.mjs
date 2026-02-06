@@ -7,10 +7,9 @@ const PLUGIN_NAME = "BundleDts";
 
 /**
  * @typedef {Object} BundleDtsOptions
- * @property {Record<string, string>} entries - Map of output name -> entry .d.ts path (optional)
- * @property {string} baseDir - The base directory of the typescript module aka baseUrl in tsconfig (optional)
- * @property {string} declarationDir - Where to look for .d.ts files (optional)
- * @property {string} [tsconfig="./tsconfig.json"] - Path to tsconfig (defaults to "./tsconfig.json")
+ * @property {string} [baseDir] - Base directory of typescript modules (optional, defaults to baseUrl from tsconfig)
+ * @property {string} [declarationDir] - Alternative root to look for .d.ts files (optional, defaults to baseDir)
+ * @property {string} [tsconfig="./tsconfig.json"] - Path to tsconfig (optional, defaults to "./tsconfig.json")
  * @property {Object} [compilerOptions] - Custom TypeScript compiler options overrides (optional)
  */
 
@@ -21,102 +20,81 @@ export default function BundleDtsPlugin(pluginOptions) {
 	let cwd = undefined;
 	let hasRun = false;
 	let entries = [];
+	let tsconfig = {};
+	let baseDir;
+	let declDir;
 
 	return {
 		name: PLUGIN_NAME,
-		buildStart(rollupOptions) {
+		async buildStart(rollupOptions) {
 			cwd = process.cwd();
 			hasRun = false;
 			entries = [];
-
-			if (pluginOptions?.entries) {
-				if (pluginOptions.baseDir || pluginOptions.declarationDir) {
-					this.warn({
-						plugin: PLUGIN_NAME,
-						pluginCode: "INVALID_OPTIONS",
-						message: "Options `baseDir` and `declarationDir` have no meaning when `entries` map is specified.",
-					});
-				}
-
-				const entriesMap = pluginOptions?.entries;
-				for (const entryId in entriesMap) {
-					if (!Object.hasOwn(entriesMap, entryId)) {
-						continue;
-					}
-
-					entries.push({
-						dtsEntryPath: path.join(cwd, getDeclarationPath(entriesMap[entryId])),
-						fileName: getDeclarationPath(entryId),
-					});
-				}
-			}
-			else {
-				if (!pluginOptions.baseDir || !pluginOptions.declarationDir) {
-					this.error({
-						plugin: PLUGIN_NAME,
-						pluginCode: "INVALID_OPTIONS",
-						message: "Both `baseDir` and `declarationDir` must be specified.",
-					});
-
-					return;
-				}
-
-				const baseDir = path.join(cwd, pluginOptions.baseDir);
-				const declDir = path.join(cwd, pluginOptions.declarationDir);
-
-				const inputs = getRollupInputs(cwd, baseDir, rollupOptions.input);
-				for (const input of inputs) {
-					entries.push({
-						dtsEntryPath: path.join(declDir, input.dir, `${input.id}.d.ts`),
-						fileName: getDeclarationPath(input.id),
-					});
-				}
-			}
-		},
-		generateBundle() {
-			if (hasRun) {
-				return;
-			}
-
-			for (const entry of entries) {
-				entry.assetId = this.emitFile({
-					type: "asset",
-					fileName: entry.fileName,
-					source: "// pending generation\n",
-				});
-			}
-		},
-		async writeBundle(outputOptions) {
-			if (hasRun) {
-				return;
-			}
-
-			hasRun = true;
+			tsconfig = {};
 
 			// load actual tsconfig
 			// FUTURE: this doesn't resolve `extends` (!!!)
-			const tsconfigPath = path.join(cwd, pluginOptions.tsconfig ?? "./tsconfig.json");
+			const tsconfigPath = path.resolve(cwd, pluginOptions.tsconfig ?? "./tsconfig.json");
 			const tsconfigRaw = await this.fs.readFile(tsconfigPath, "utf8");
 			const tsconfigActual = parseConfigFileTextToJson(tsconfigPath, tsconfigRaw);
 			if (tsconfigActual.error) {
 				throw new Error(`failed to parse tsconfig: ${tsconfigActual.error.messageText}`);
 			}
 
+			tsconfig = tsconfigActual.config;
+
+			// determine entries
+			baseDir = path.resolve(cwd, pluginOptions.baseDir ?? tsconfig?.compilerOptions?.baseDir ?? "");
+			declDir = path.resolve(cwd, pluginOptions.declarationDir ?? baseDir);
+
+			const inputs = getRollupInputs(cwd, rollupOptions.input);
+			for (const input of inputs) {
+				const declPath = getDeclarationPath(input.inputPath);
+				entries.push({
+					inputPath: path.join(declDir, path.relative(baseDir, declPath)),
+					outputFileName: path.basename(declPath),
+				});
+			}
+		},
+		generateBundle(outputOptions) {
+			if (hasRun) {
+				return;
+			}
+
+			const outputDir = outputOptions.dir === undefined
+				? path.resolve(cwd, path.dirname(outputOptions.file))
+				: path.resolve(cwd, outputOptions.dir);
+
+			for (const entry of entries) {
+				entry.outputPath = path.join(outputDir, entry.outputFileName);
+				entry.assetId = this.emitFile({
+					type: "asset",
+					fileName: entry.outputFileName,
+					source: "// pending generation\n",
+				});
+			}
+		},
+		async writeBundle() {
+			if (hasRun) {
+				return;
+			}
+
+			hasRun = true;
+
 			// fake package info
-			const declarationDir = path.join(cwd, pluginOptions.declarationDir);
-			const fakePackageJsonPath = path.join(declarationDir, "package.json");
-			const fakeTsconfigJsonPath = path.join(declarationDir, "tsconfig.json");
+			const fakePackageJsonPath = path.join(declDir, "package.json");
+			const fakeTsconfigJsonPath = path.join(declDir, "tsconfig.json");
 			const packageJson = {
 				name: "dts",
 			};
 
 			// build a fake config
 			const tsconfigOverride = {
-				...tsconfigActual.config,
+				...tsconfig,
 				compilerOptions: {
-					...tsconfigActual.config.compilerOptions,
+					...tsconfig.compilerOptions,
 					// override baseUrl to correctly resolve TS' paths mappings
-					baseUrl: declarationDir,
+					baseUrl: declDir,
 					skipLibCheck: true,
 					// apply user overrides
 					...pluginOptions.compilerOptions,
@@ -126,13 +104,12 @@ export default function BundleDtsPlugin(pluginOptions) {
 			};
 
 			for (const entry of entries) {
-				const outputPath = path.join(cwd, outputOptions.dir, this.getFileName(entry.assetId));
 				const extractorConfig = ExtractorConfig.prepare({
 					packageJsonFullPath: fakePackageJsonPath,
 					packageJson,
 					configObject: {
-						mainEntryPointFilePath: entry.dtsEntryPath,
-						projectFolder: declarationDir,
+						mainEntryPointFilePath: entry.inputPath,
+						projectFolder: declDir,
 						compiler: {
 							overrideTsconfig: tsconfigOverride,
 							tsconfigFilePath: fakeTsconfigJsonPath,
@@ -141,7 +118,7 @@ export default function BundleDtsPlugin(pluginOptions) {
 						dtsRollup: {
 							enabled: true,
 							omitTrimmingComments: true,
-							publicTrimmedFilePath: outputPath,
+							publicTrimmedFilePath: entry.outputPath,
 						},
 					},
 				});
@@ -173,6 +150,10 @@ export default function BundleDtsPlugin(pluginOptions) {
 
 const RE_TS = /(?<!\.d)\.(tsx?|[mc]ts)$/i;
 const EXT_MAP = {
+	js: ".d.ts",
+	jsx: ".d.ts",
+	mjs: ".d.mts",
+	cjs: ".d.cts",
 	ts: ".d.ts",
 	tsx: ".d.ts",
 	mts: ".d.mts",
@@ -195,25 +176,24 @@ function getDeclarationPath(path) {
 		return `${path}.d.ts`;
 	}
 
-	return `${ts.base}${EXT_MAP[ts.ext]}`;
+	return `${ts.base}${EXT_MAP[ts.ext] ?? ".d.ts"}`;
 }
 
-function getRollupInputs(cwd, baseDir, input) {
+function getRollupInputs(cwd, input) {
 	switch (typeof input) {
 		case "string":
-			return [ getRollupInput(cwd, baseDir, input) ];
+			return [ getRollupInput(cwd, input) ];
 
 		case "object":
 			return Array.isArray(input)
-				? input.map(file => getRollupInput(cwd, baseDir, file))
-				: Object.keys(input).map(name => getRollupInput(cwd, baseDir, input[name], name));
+				? input.map(file => getRollupInput(cwd, file))
+				: Object.keys(input).map(name => getRollupInput(cwd, input[name], name));
 	}
 }
 
-function getRollupInput(cwd, baseDir, file, name) {
-	const parsed = path.parse(file);
+function getRollupInput(cwd, file, name) {
 	return {
-		id: name ?? parsed.name,
-		dir: path.relative(baseDir, path.join(cwd, parsed.dir)),
+		name: name ?? path.parse(file).name,
+		inputPath: path.resolve(cwd, file),
 	};
 }
