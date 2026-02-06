@@ -1,4 +1,4 @@
-import type { InputOptions, OutputOptions } from "rollup";
+import type { InputOptions, OutputOptions } from "rolldown";
 
 import type { Reporter } from "~/cli";
 
@@ -37,6 +37,10 @@ export enum Env {
 	Production = "prod",
 }
 
+export function isEnv(context: BuildContext, ...envs: Env[]): boolean {
+	return envs.includes(context.env);
+}
+
 export function inEnv(...envs: Env[]): Configurator<boolean> {
-	return (_, context) => envs.includes(context.env);
+	return (_, context) => isEnv(context, ...envs);
 }

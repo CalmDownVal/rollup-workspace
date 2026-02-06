@@ -1,15 +1,15 @@
-import type { OutputOptions, Plugin } from "rollup";
+import type { OutputOptions, Plugin } from "rolldown";
 
 import { Builder } from "~/build/Builder";
 
 import type { BuildContext, BuildTarget, LogSuppression } from "./common";
 import { createEntity, type AnyEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import type { OutputConfig } from "./OutputDeclaration";
-import { declarePipeline, type AnyPipelineDeclaration, type PipelineDeclaration } from "./PipelineDeclaration";
-import type { AnyPluginDeclaration } from "./PluginDeclaration";
+import type { OutputConfig } from "./OutputDefinition";
+import { definePipeline, type AnyPipelineDeclaration, type PipelineDefinition } from "./PipelineDefinition";
+import type { AnyPluginDeclaration } from "./PluginDefinition";
 
-export type TargetDeclaration<
+export type TargetDefinition<
 	TName extends string,
 	TConfig extends OutputConfig,
 	TPipelines extends EntityMap<AnyPipelineDeclaration>,
@@ -30,8 +30,8 @@ export type TargetDeclaration<
 
 	pipeline<TPipelineName extends string, TPipeline extends AnyPipelineDeclaration>(
 		name: TPipelineName,
-		block: (pipeline: PipelineDeclaration<TPipelineName, TConfig, {}, {}>) => TPipeline,
-	): TargetDeclaration<TName, TConfig, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
+		block: (pipeline: PipelineDefinition<TPipelineName, TConfig, {}, {}>) => TPipeline,
+	): TargetDefinition<TName, TConfig, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
 
 	build(
 		block: (target: Target<TName, TConfig, TPipelines>) => void,
@@ -42,7 +42,7 @@ export type Target<
 	TName extends string,
 	TConfig extends OutputConfig,
 	TPipelines extends EntityMap<AnyPipelineDeclaration>,
-> = Omit<TargetDeclaration<TName, TConfig, TPipelines>, "pipeline" | "override" | "build"> & {
+> = Omit<TargetDefinition<TName, TConfig, TPipelines>, "pipeline" | "override" | "build"> & {
 	entry(
 		unit: string,
 		entryPath: string,
@@ -50,16 +50,16 @@ export type Target<
 };
 
 export type AnyTargetDeclaration = (
-	TargetDeclaration<any, any, any>
+	TargetDefinition<any, any, any>
 );
 
 export type AnyTarget = (
 	Target<any, any, any>
 );
 
-export function declareTarget<TName extends string, TTarget extends AnyTargetDeclaration>(
+export function defineTarget<TName extends string, TTarget extends AnyTargetDeclaration>(
 	name: TName,
-	block: (target: TargetDeclaration<TName, OutputConfig, {}>) => TTarget,
+	block: (target: TargetDefinition<TName, OutputConfig, {}>) => TTarget,
 ): TTarget {
 	const pipelineContainer = createEntityContainer<AnyPipelineDeclaration>("Pipeline");
 	return block(
@@ -105,7 +105,7 @@ function onPipeline(
 	name: string,
 	block: (pipeline: AnyPipelineDeclaration) => AnyPipelineDeclaration,
 ): AnyTargetDeclaration {
-	const pipeline = block(declarePipeline(name));
+	const pipeline = block(definePipeline(name));
 	if (this.isFinal) {
 		this.pipelineContainer.add(pipeline);
 		return this;
@@ -211,13 +211,13 @@ function collectPlugins(
 
 		const pluginConfig = await plugin.getConfig(undefined, context);
 		const pluginFactory = await plugin.loadPlugin(context);
-		const rollupPlugin = pluginFactory(pluginConfig);
+		const rolldownPlugin = pluginFactory(pluginConfig);
 
 		plugin.suppressions.forEach(code => suppressions.push({
 			code,
-			plugin: rollupPlugin.name,
+			plugin: rolldownPlugin.name,
 		}));
 
-		return rollupPlugin;
+		return rolldownPlugin;
 	});
 }

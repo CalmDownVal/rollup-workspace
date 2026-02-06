@@ -1,6 +1,6 @@
 import { pathToFileURL } from "node:url";
 
-import { rollup } from "rollup";
+import { rolldown } from "rolldown";
 
 import type { BuildContext, BuildTarget, BuildTask } from "~/factory";
 import type { FileSystem, Watcher } from "~/FileSystem";
@@ -37,13 +37,13 @@ export class Builder {
 			const targets = await this.getTargets(call);
 			for (const target of targets) {
 				signal?.throwIfAborted();
-				bundle = await rollup(target.input);
+				bundle = await rolldown(target.input);
 				for (const output of target.outputs) {
 					signal?.throwIfAborted();
 					await bundle.write(output);
 				}
 
-				bundle.watchFiles.forEach(it => watchFiles.add(it));
+				(await bundle.watchFiles).forEach(it => watchFiles.add(it));
 
 				await bundle.close();
 				bundle = undefined;

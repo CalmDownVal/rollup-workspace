@@ -1,12 +1,12 @@
 import type { WriteStream } from "node:tty";
 import { EOL } from "node:os";
 
-import type { LogLevel as RollupLogLevel } from "rollup";
+import type { LogLevel as RolldownLogLevel } from "rolldown";
 
 import { AbortError } from "~/AbortError";
 import type { Package } from "~/workspace";
 
-export type LogLevel = RollupLogLevel | "error";
+export type LogLevel = RolldownLogLevel | "error";
 
 export interface PackageInfo {
 	readonly pkg: Package;
@@ -237,7 +237,7 @@ export class Reporter {
 			result = this.printTreeNode(
 				pkg.downstreamDependencies[index],
 				prefix + li1,
-				isLast ? "└─ " : "├─ ",
+				isLast ? "╰─ " : "├─ ",
 				isLast ? "   " : "│  ",
 			);
 

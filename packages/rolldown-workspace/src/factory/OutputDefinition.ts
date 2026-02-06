@@ -1,10 +1,10 @@
-import type { OutputOptions as RollupOutputConfig } from "rollup";
+import type { OutputOptions } from "rolldown";
 
 import { createEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import type { AnyPluginDeclaration } from "./PluginDeclaration";
+import type { AnyPluginDeclaration } from "./PluginDefinition";
 
-export type OutputDeclaration<
+export type OutputDefinition<
 	TName extends string,
 	TConfig extends OutputConfig,
 	TPlugins extends EntityMap<AnyPluginDeclaration>,
@@ -16,20 +16,20 @@ export type OutputDeclaration<
 
 	plugin<TPlugin extends AnyPluginDeclaration>(
 		plugin: TPlugin,
-	): OutputDeclaration<TName, TConfig, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }>;
+	): OutputDefinition<TName, TConfig, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }>;
 }>;
 
-export interface OutputConfig extends RollupOutputConfig {
+export interface OutputConfig extends OutputOptions {
 	[key: string]: unknown;
 }
 
 export type AnyOutputDeclaration = (
-	OutputDeclaration<any, any, any>
+	OutputDefinition<any, any, any>
 );
 
-export function declareOutput<TName extends string, TConfig extends OutputConfig>(
+export function defineOutput<TName extends string, TConfig extends OutputConfig>(
 	name: TName,
-): OutputDeclaration<TName, TConfig, {}> {
+): OutputDefinition<TName, TConfig, {}> {
 	const pluginContainer = createEntityContainer<AnyPluginDeclaration>("Plugin");
 	return createEntity(name, {
 		plugins: pluginContainer.entityMap,

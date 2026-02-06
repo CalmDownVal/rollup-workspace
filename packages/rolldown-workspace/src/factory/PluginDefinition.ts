@@ -1,9 +1,9 @@
-import type { PluginImpl } from "rollup";
+import type { Plugin } from "rolldown";
 
 import type { BuildContext } from "./common";
 import { createEntity, type Entity } from "./Entity";
 
-export type PluginDeclaration<TName extends string, TConfig extends object> = Entity<TName, TConfig, {
+export type PluginDefinition<TName extends string, TConfig extends object> = Entity<TName, TConfig, {
 	/** @internal */
 	readonly loadPlugin: PluginLoader<TConfig>;
 
@@ -12,21 +12,21 @@ export type PluginDeclaration<TName extends string, TConfig extends object> = En
 
 	suppress(
 		code: string,
-	): PluginDeclaration<TName, TConfig>;
+	): PluginDefinition<TName, TConfig>;
 }>;
 
 export interface PluginLoader<TConfig extends object> {
-	(context: BuildContext): Promise<PluginImpl<TConfig>>;
+	(context: BuildContext): Promise<(config: TConfig) => Plugin>;
 }
 
 export type AnyPluginDeclaration = (
-	PluginDeclaration<any, any>
+	PluginDefinition<any, any>
 );
 
-export function declarePlugin<TName extends string, TConfig extends object>(
+export function definePlugin<TName extends string, TConfig extends object>(
 	name: TName,
 	loadPlugin: PluginLoader<TConfig>,
-): PluginDeclaration<TName, TConfig> {
+): PluginDefinition<TName, TConfig> {
 	return createEntity(name, {
 		suppressions: new Set<string>(),
 		loadPlugin,
