@@ -64,14 +64,8 @@ export class Builder {
 			return;
 		}
 
-		const { watchers } = this;
-		this.watchFiles.forEach(path => {
-			const watcher = this.fs.watch(path);
-			watcher.on("change", callback);
-			watchers.set(path, watcher);
-		});
-
 		this.onFileChange = callback;
+		this.watchFiles.forEach(this.openWatcher);
 		this.isWatching = true;
 	}
 
@@ -93,26 +87,29 @@ export class Builder {
 			return;
 		}
 
-		const { watchers } = this;
 		const prevWatchFiles = this.watchFiles;
-
-		// watchers to close
-		prevWatchFiles.difference(nextWatchFiles).forEach(path => {
-			const watcher = watchers.get(path);
-			if (watchers.delete(path)) {
-				watcher!.close();
-			}
-		});
-
-		// watchers to open
-		nextWatchFiles.difference(prevWatchFiles).forEach(path => {
-			const watcher = this.fs.watch(path);
-			watcher.on("change", this.onFileChange);
-			watchers.set(path, watcher);
-		});
+		prevWatchFiles.difference(nextWatchFiles).forEach(this.closeWatcher);
+		nextWatchFiles.difference(prevWatchFiles).forEach(this.openWatcher);
 
 		this.watchFiles = nextWatchFiles;
 	}
+
+	private readonly closeWatcher = (path: string) => {
+		const watcher = this.watchers.get(path);
+		if (this.watchers.delete(path)) {
+			watcher!.close();
+		}
+	};
+
+	private readonly openWatcher = (path: string) => {
+		const watcher = this.fs.watch(path);
+		watcher.on("change", this.onFileChange);
+		watcher.on("error", () => {
+			this.watchers.delete(path);
+		});
+
+		this.watchers.set(path, watcher);
+	};
 
 	private async getTargets(call: BuildCall) {
 		const { pkg } = this;

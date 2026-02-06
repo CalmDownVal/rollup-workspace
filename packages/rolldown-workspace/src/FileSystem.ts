@@ -20,7 +20,7 @@ export interface GlobOptions {
 
 export interface Watcher {
 	close: () => void;
-	on: (type: "change", listener: () => void) => void;
+	on: (type: "change" | "error", listener: () => void) => void;
 }
 
 export async function getNodeFileSystem(): Promise<FileSystem> {
