@@ -26,14 +26,14 @@ const SL_LINK_RELATIVE = "link-relative";
  */
 
 /**
- * @param {CopyOptions} options
+ * @param {CopyOptions} pluginOptions
  */
-export default function CopyPlugin(options) {
-	const targets = options?.targets ?? [];
-	const symLinks = [ SL_IGNORE, SL_COPY_FILE, SL_LINK_ABSOLUTE, SL_LINK_RELATIVE ].find(it => options?.symLinks === it) ?? SL_IGNORE;
+export default function CopyPlugin(pluginOptions) {
+	const targets = pluginOptions?.targets ?? [];
+	const symLinks = [ SL_IGNORE, SL_COPY_FILE, SL_LINK_ABSOLUTE, SL_LINK_RELATIVE ].find(it => pluginOptions?.symLinks === it) ?? SL_IGNORE;
 
 	const exec = (context, message, block) => {
-		if (options?.dryRun) {
+		if (pluginOptions?.dryRun) {
 			message && context.info({
 				plugin: PLUGIN_NAME,
 				pluginCode: "DRY_RUN",
@@ -109,7 +109,7 @@ export default function CopyPlugin(options) {
 	return {
 		name: PLUGIN_NAME,
 		async buildStart() {
-			if (options.runOnce !== false && !isFirstBeforeRun) {
+			if (pluginOptions?.runOnce !== false && !isFirstBeforeRun) {
 				return;
 			}
 
@@ -122,7 +122,7 @@ export default function CopyPlugin(options) {
 			}
 		},
 		async closeBundle() {
-			if (options.runOnce !== false && !isFirstAfterRun) {
+			if (pluginOptions?.runOnce !== false && !isFirstAfterRun) {
 				return;
 			}
 

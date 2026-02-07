@@ -1,29 +1,65 @@
 import * as path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PLUGIN_NAME = "TextLoader";
+const RE_RELATIVE = /^\.\.?[/\\]/;
 
 /**
  * @typedef {Object} TextLoaderOptions
- * @property {string|string[]} include glob pattern(s) of files to include
+ * @property {boolean} [loadRaw=true] whether to automatically load imports marked with "?raw" - only works with relative or pre-resolved paths (defaults to true)
+ * @property {string|string[]} [include] glob pattern(s) of files to include (optional)
  * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
  */
 
 /**
- * @param {TextLoaderOptions} pluginOptions
+ * @param {TextLoaderOptions} [pluginOptions]
  */
 export default function TextLoaderPlugin(pluginOptions) {
-	const include = toArray(pluginOptions.include);
-	const exclude = toArray(pluginOptions.exclude ?? []);
+	const include = toArray(pluginOptions?.include ?? []);
+	const exclude = toArray(pluginOptions?.exclude ?? []);
+	const loadAsRaw = new Set();
+
+	const shouldTransform = id => {
+		if (loadAsRaw.has(id)) {
+			// the import was marked with ?raw
+			return true;
+		}
+
+		if (!include.some(pattern => path.matchesGlob(id, pattern))) {
+			// the import did not match any include pattern
+			return false;
+		}
+
+		if (exclude.some(pattern => path.matchesGlob(id, pattern))) {
+			// the import matched an exclude pattern
+			return false;
+		}
+
+		return true;
+	};
+
 	return {
 		name: PLUGIN_NAME,
-		async transform(code, id) {
-			if (!include.some(pattern => path.matchesGlob(id, pattern))) {
-				// the import did not match any include pattern
+		resolveId(source, importer) {
+			if (pluginOptions?.loadRaw === false) {
+				return;
+			}
+
+			if (!RE_RELATIVE.test(source) && !path.isAbsolute(source)) {
+				return;
+			}
+
+			const url = URL.parse(source, pathToFileURL(importer ?? process.cwd()));
+			if (!url || url.searchParams.get("raw") === null) {
 				return null;
 			}
 
-			if (exclude.some(pattern => path.matchesGlob(id, pattern))) {
-				// the import matched an exclude pattern
+			const id = fileURLToPath(url.href);
+			loadAsRaw.add(id);
+			return id;
+		},
+		async transform(code, id) {
+			if (!shouldTransform(id)) {
 				return null;
 			}
 

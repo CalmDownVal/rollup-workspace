@@ -18,13 +18,13 @@ const PLUGIN_NAME = "Delete";
  */
 
 /**
- * @param {DeleteOptions} options
+ * @param {DeleteOptions} pluginOptions
  */
-export default function DeletePlugin(options) {
-	const targets = toArray(options?.targets ?? []).map(it => typeof it === "string" ? { include: it } : it);
+export default function DeletePlugin(pluginOptions) {
+	const targets = toArray(pluginOptions?.targets ?? []).map(it => typeof it === "string" ? { include: it } : it);
 
 	const exec = (context, message, block) => {
-		if (options?.dryRun) {
+		if (pluginOptions?.dryRun) {
 			message && context.info({
 				plugin: PLUGIN_NAME,
 				pluginCode: "DRY_RUN",
@@ -81,7 +81,7 @@ export default function DeletePlugin(options) {
 	return {
 		name: PLUGIN_NAME,
 		async buildStart() {
-			if (options.runOnce !== false && !isFirstBeforeRun) {
+			if (pluginOptions?.runOnce !== false && !isFirstBeforeRun) {
 				return;
 			}
 
@@ -95,7 +95,7 @@ export default function DeletePlugin(options) {
 			}
 		},
 		async closeBundle() {
-			if (options.runOnce !== false && !isFirstAfterRun) {
+			if (pluginOptions?.runOnce !== false && !isFirstAfterRun) {
 				return;
 			}
 
